@@ -1,0 +1,356 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using System.Diagnostics;
+
+namespace ActualTicTacToe
+{
+    public partial class Form1 : Form
+    {
+        const int defaultNum = 4; //all numbers based on this, for convenience
+        const int cols = defaultNum;
+        const int rows = defaultNum;
+        const int nInARow = defaultNum; //how many marked squares required to win
+        public Square[,] squares = new Square[rows, cols]; //array of all squares in the matrix
+        public Form1()
+        {
+            InitializeComponent();
+            createSquares();
+        }
+
+        public bool hasWon(Square square, Square.SquareState st)
+        {
+            int subsequent = 0; //how many continuous squares of desired state
+            //check the column our square is in
+            for (int i = 0; i < cols; i++)
+            {
+                if (squares[square.X, i].State != st)
+                {
+
+                    subsequent = 0; //not a continuous line of squares anymore
+                }
+                else
+                {
+                    subsequent++;
+                    if (subsequent == nInARow) //achieve n (in this case 3) in a row
+                    {
+                        return true;
+                    }
+                }
+            }
+            subsequent = 0; //reset 
+            //check the row our square is in (same shit)
+            for (int i = 0; i < rows; i++)
+            {
+                if (squares[i, square.Y].State != st)
+                {
+                    subsequent = 0;
+                }
+                else
+                {
+                    subsequent++;
+                    if (subsequent == nInARow)
+                    {
+                        return true;
+                    }
+
+                }
+            }
+            subsequent = 0;
+            //same shit but with a diagonal
+            bool checkDiagonals(bool antiDiag)
+            {
+
+
+
+                List<List<Square>> myDiagonals = getDiagonals(antiDiag);
+                foreach (List<Square> diagonal in myDiagonals)
+                {
+                    subsequent = 0;
+                    foreach (Square diagSquare in diagonal)
+                    {
+                        if (diagSquare.State != st)
+                        {
+                            subsequent = 0;
+                        }
+                        else
+                        {
+                            subsequent++;
+                            if (subsequent == nInARow)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+
+                }
+                return false;
+            }
+            if (checkDiagonals(false)) //check normal diagonal
+            {
+                return true;
+            }
+            subsequent = 0;
+            if (checkDiagonals(true)) //check antidiagonal
+            {
+                return true;
+            }
+
+
+
+
+
+
+            return false;
+
+
+        }
+
+        public List<Square> getDiagonalCorners(bool antiDiag)
+        {
+            List<Square> myCorners = new List<Square>();
+            foreach (Square square in squares)
+            {
+                //do we want the necessary corners for a diagonal, or an antidiagonal?
+                if (antiDiag)
+                {
+                    if (square.X == rows - 1 || square.Y == 0) //is it the right edge or the top edge? if so - it's a necessary corner matrix
+                    {
+                        myCorners.Add(square);
+
+                    }
+                }
+                //corners for a normal diagonal, not antidiagonal
+                else
+                {
+                    if (square.X == 0 || square.Y == 0) //is it on the left edge or the top edge? if so - it's a necessary corner matrix
+                    {
+                        myCorners.Add(square);
+                    }
+                }
+
+            }
+            return myCorners;
+        }
+        public List<List<Square>> getDiagonals(bool antiDiag)
+        {
+            List<List<Square>> allDiags = new List<List<Square>>(); //all diagonals in matrix
+            List<Square> myCorners = getDiagonalCorners(antiDiag);
+            foreach (Square cornerSquare in myCorners)
+            {
+                List<Square> myDiag = new List<Square>(); //make a 'diagonal' for every corner square that exists. 
+                Point currentPoint = new Point(cornerSquare.X, cornerSquare.Y);
+
+                if (antiDiag)
+                {
+                    while (currentPoint.X >= 0 && currentPoint.Y < cols) //do the thing until our point hits the left side or the bottom
+                    {
+                        myDiag.Add(squares[currentPoint.X, currentPoint.Y]);
+                        currentPoint.X -= 1;
+                        currentPoint.Y += 1;
+                    }
+                }
+                else
+                {
+                    while (currentPoint.X < rows && currentPoint.Y < cols) //do the thing until our point hits the right side or the bottom
+                    {
+                        myDiag.Add(squares[currentPoint.X, currentPoint.Y]);
+                        currentPoint.X += 1;
+                        currentPoint.Y += 1;
+                    }
+                }
+                allDiags.Add(myDiag);
+            }
+            return allDiags;
+        }
+        public static List<Square> emptySquareIndices(Square[,] squaresCopy) //get list of all unmarked squares in matrix, name is misleading (very little to do with indices)
+        {
+            List<Square> emptySquares = new List<Square>();
+            foreach (Square square in squaresCopy)
+            {
+                if (square.State == Square.SquareState.None)
+                {
+                    emptySquares.Add(square);
+                }
+            }
+            return emptySquares;
+        }
+        public  int evaluate(Square[,] squaresCopy)
+        {
+            foreach (Square square in squaresCopy)
+            {
+                if (hasWon(square, Square.SquareState.X))
+                {
+                    return +10;
+                }
+                else if (hasWon(square, Square.SquareState.O))
+                {
+                    return -10;
+                }
+            }
+            return 0;
+        }
+        
+        public int minimax(Square[,] squaresCopy, int depth, bool isMax)
+        {
+            int score = evaluate(squaresCopy);
+            if (score == 10)
+            {
+                return score;
+            }
+            if (score == -10)
+            {
+                return score;
+            }
+            List<Square> emptySquares = emptySquareIndices(squaresCopy);
+            if (emptySquares.Count == 0)
+            {
+                return 0;
+            }
+            if (isMax)
+            {
+                int best = -1000;
+                foreach (Square square in squaresCopy)
+                {
+                    if (square.State == Square.SquareState.None)
+                    {
+                        square.State = Square.SquareState.X;
+                        best = Math.Max(best, minimax(squaresCopy, depth + 1, !isMax));
+                        square.State = Square.SquareState.None;
+                    }
+                }
+                return best;
+            }
+            else
+            {
+                int best = 1000;
+                foreach (Square square in squaresCopy)
+                {
+                    if (square.State == Square.SquareState.None)
+                    {
+                        square.State = Square.SquareState.O;
+                        best = Math.Min(best, minimax(squaresCopy, depth + 1, !isMax));
+                        square.State = Square.SquareState.None;
+                    }
+                }
+                return best;
+            }
+           
+        }
+        
+        public PlayerMove findBestMove(Square[,] squaresCopy)
+        {
+            int bestVal = -1000;
+            PlayerMove bestMove = new PlayerMove();
+            bestMove.X = -1;
+            bestMove.Y = -1;
+            foreach (Square square in squaresCopy)
+            {
+                if (square.State == Square.SquareState.None)
+                {
+                    square.State = Square.SquareState.X;
+                    int moveVal = minimax(squaresCopy, 0, false);
+                    square.State = Square.SquareState.None;
+                    if (moveVal > bestVal)
+                    {
+                        bestMove.X = square.X;
+                        bestMove.Y = square.Y;
+                        bestVal = moveVal;
+                    }
+                }
+            }
+            return bestMove;
+        }
+        
+        public void createSquares()
+        {
+            for (int y = 0; y < cols; y++)
+            {
+                for (int x = 0; x < rows; x++)
+                {
+                    Square square = new Square()
+                    {
+                        Size = new Size(100, 100),
+                        Location = new Point(x * 100, y * 100),
+                        X = x,
+                        Y = y,
+                    };
+
+                    squares[x, y] = square;
+                    this.Controls.Add(square);
+                    square.setState(Square.SquareState.None);
+                    
+                    square.Click += (sender, args) =>
+                    {
+                        bool clicked = false;
+                        List<Square> emptySquares = emptySquareIndices(squares);
+
+                            if (emptySquares.Contains(square))
+                            {
+                                square.setState(Square.SquareState.O);
+                            clicked = true;
+                            }
+
+                       
+
+                        if (hasWon(square, Square.SquareState.O))
+                        {
+                            MessageBox.Show("you won");
+                        }
+
+                        //first minmax invocation
+                        Square[,] squaresCopy = new Square[rows, cols];
+                        squaresCopy = squares;
+                        if (clicked)
+                        {
+                            //infoStruct bestPlayInfo = miniMax(Square.SquareState.X, squaresCopy);
+                            PlayerMove bestMove = findBestMove(squaresCopy);
+                            squares[bestMove.X, bestMove.Y].setState(Square.SquareState.X);
+                            //play on favorable cell
+                            //squares[bestPlayInfo.X, bestPlayInfo.Y].setState(Square.SquareState.X);
+                        }
+
+
+
+
+
+
+
+
+                    };
+                }
+            }
+        }
+        public class PlayerMove
+        {
+            public int X, Y;
+        };
+        public class Square : Button
+        {
+            public int X;
+            public int Y;
+            public SquareState State { get; set; }
+
+            public enum SquareState
+            {
+                None,
+                O,
+                X
+            }
+            public void setState(SquareState st)
+            {
+                this.State = st;
+                this.Text = st != SquareState.None ? st.ToString() : String.Empty;
+            }
+
+
+
+        }
+    }
+}
